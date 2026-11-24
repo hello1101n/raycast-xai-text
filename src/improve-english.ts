@@ -2,7 +2,6 @@ import { Clipboard, closeMainWindow, getPreferenceValues, showHUD, showToast, To
 import { showGrokFailure } from "./feedback";
 import { runGrok } from "./grok";
 import { buildImprovePrompt } from "./prompt";
-import { Preferences } from "./preferences";
 import { readSelection } from "./selection";
 
 export default async function Command() {

@@ -12,7 +12,6 @@ import { useEffect, useState } from "react";
 import { showGrokFailure } from "./feedback";
 import { runGrok } from "./grok";
 import { buildTranslatePrompt, resolveTargetLanguage } from "./prompt";
-import { Preferences } from "./preferences";
 import { readSelection } from "./selection";
 
 export default function Command() {

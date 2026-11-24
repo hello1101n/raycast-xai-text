@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { buildGrokArgs, findGrokBinary } from "../src/grok";
+import { GrokFailure, buildGrokArgs, findGrokBinary, interpretGrokResult } from "../src/grok";
 import { buildImprovePrompt, buildTranslatePrompt, cleanModelOutput, resolveTargetLanguage } from "../src/prompt";
 
 describe("prompts", () => {
@@ -40,6 +40,20 @@ describe("prompts", () => {
     assert.equal(resolveTargetLanguage(undefined), "Russian");
     assert.equal(resolveTargetLanguage("  "), "Russian");
     assert.equal(resolveTargetLanguage(" French "), "French");
+  });
+});
+
+describe("interpretGrokResult", () => {
+  it("keeps a successful reply that mentions not being signed in", () => {
+    assert.equal(interpretGrokResult(null, "You are not signed in to the club.\n", ""), "You are not signed in to the club.");
+  });
+
+  it("reports the CLI auth error only when the process fails", () => {
+    const error = Object.assign(new Error("Command failed"), { code: 1 });
+    assert.throws(
+      () => interpretGrokResult(error, "", "Not signed in. Run grok login"),
+      (caught: unknown) => caught instanceof GrokFailure && caught.kind === "not-signed-in",
+    );
   });
 });
 

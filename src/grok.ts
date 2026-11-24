@@ -1,4 +1,4 @@
-import { execFile, type ExecException } from "child_process";
+import { execFile } from "child_process";
 import { accessSync, constants } from "fs";
 import { homedir, tmpdir } from "os";
 import { delimiter, join } from "path";
@@ -6,6 +6,7 @@ import { cleanModelOutput } from "./prompt";
 
 export const INSTALL_DOCS_URL = "https://docs.x.ai/build/overview";
 const TIMEOUT_MS = 60_000;
+const NOT_FOUND_MESSAGE = "Install the Grok CLI, then run grok login.";
 
 // Tool ids accepted by grok 1.0.92. Unknown names only warn, so they are omitted.
 const DISALLOWED_TOOLS = [
@@ -66,14 +67,7 @@ export function findGrokBinary(
     return isExecutable(explicit) ? explicit : undefined;
   }
 
-  const dirs = [
-    ...pathEnv.split(delimiter).filter(Boolean),
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    join(home, ".local", "bin"),
-    join(home, ".grok", "bin"),
-    join(home, ".npm-global", "bin"),
-  ];
+  const dirs = [...pathEnv.split(delimiter).filter(Boolean), ...commonBinDirs(home)];
   const seen = new Set<string>();
   for (const dir of dirs) {
     const candidate = join(dir, "grok");
@@ -120,7 +114,7 @@ export function buildGrokArgs(prompt: string, model: string | undefined, cwd: st
 export function runGrok(prompt: string, options: GrokRunOptions): Promise<string> {
   const binary = findGrokBinary(options.grokPath);
   if (!binary) {
-    return Promise.reject(new GrokFailure("not-found", "Install the Grok CLI, then run grok login."));
+    return Promise.reject(new GrokFailure("not-found", NOT_FOUND_MESSAGE));
   }
 
   const cwd = tmpdir();
@@ -135,33 +129,24 @@ export function runGrok(prompt: string, options: GrokRunOptions): Promise<string
         env: childEnv(),
       },
       (error, stdout, stderr) => {
-        const out = stdout.toString();
-        const err = stderr.toString();
-        if (isNotSignedIn(out, err)) {
-          reject(new GrokFailure("not-signed-in", "Run `grok login` in a terminal, then try again."));
-          return;
+        try {
+          resolve(interpretGrokResult(error, stdout.toString(), stderr.toString()));
+        } catch (failure) {
+          reject(failure);
         }
-        if (error) {
-          if (isTimeout(error)) {
-            reject(new GrokFailure("timeout", "The Grok CLI took too long. Try again."));
-            return;
-          }
-          if (error.code === "ENOENT") {
-            reject(new GrokFailure("not-found", "Install the Grok CLI, then run grok login."));
-            return;
-          }
-          reject(new GrokFailure("failed", failureDetail(err, error.message)));
-          return;
-        }
-        const cleaned = cleanModelOutput(out);
-        if (!cleaned) {
-          reject(new GrokFailure("failed", "Grok returned no text."));
-          return;
-        }
-        resolve(cleaned);
       },
     );
   });
+}
+
+function commonBinDirs(home: string): string[] {
+  return [
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    join(home, ".local", "bin"),
+    join(home, ".grok", "bin"),
+    join(home, ".npm-global", "bin"),
+  ];
 }
 
 function childEnv(): NodeJS.ProcessEnv {
@@ -169,13 +154,7 @@ function childEnv(): NodeJS.ProcessEnv {
   // Use the grok login session. Do not fall back to an API key.
   delete env.XAI_API_KEY;
   env.GROK_DISABLE_AUTOUPDATER = "1";
-  const prefix = [
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    join(homedir(), ".local", "bin"),
-    join(homedir(), ".grok", "bin"),
-  ];
-  env.PATH = [...prefix, env.PATH ?? ""].filter(Boolean).join(delimiter);
+  env.PATH = [...commonBinDirs(homedir()), env.PATH ?? ""].filter(Boolean).join(delimiter);
   return env;
 }
 
@@ -188,11 +167,37 @@ function isExecutable(filePath: string): boolean {
   }
 }
 
-function isNotSignedIn(stdout: string, stderr: string): boolean {
-  return /not signed in/i.test(`${stdout}\n${stderr}`);
+type GrokProcessError = {
+  message: string;
+  killed?: boolean;
+  code?: string | number;
+};
+
+export function interpretGrokResult(error: GrokProcessError | null, stdout: string, stderr: string): string {
+  if (error) {
+    if (isNotSignedIn(`${stderr}\n${error.message}`)) {
+      throw new GrokFailure("not-signed-in", "Run `grok login` in a terminal, then try again.");
+    }
+    if (isTimeout(error)) {
+      throw new GrokFailure("timeout", "The Grok CLI took too long. Try again.");
+    }
+    if (error.code === "ENOENT") {
+      throw new GrokFailure("not-found", NOT_FOUND_MESSAGE);
+    }
+    throw new GrokFailure("failed", failureDetail(stderr, error.message));
+  }
+  const cleaned = cleanModelOutput(stdout);
+  if (!cleaned) {
+    throw new GrokFailure("failed", "Grok returned no text.");
+  }
+  return cleaned;
 }
 
-function isTimeout(error: ExecException): boolean {
+function isNotSignedIn(output: string): boolean {
+  return /not signed in/i.test(output);
+}
+
+function isTimeout(error: GrokProcessError): boolean {
   return error.killed === true || error.code === "ETIMEDOUT" || /timed out/i.test(error.message);
 }
 
