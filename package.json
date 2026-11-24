@@ -1,0 +1,88 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "grok-text",
+  "title": "Grok Text",
+  "description": "Translate a selection and improve English with the local Grok CLI",
+  "icon": "icon.png",
+  "author": "hello1101n",
+  "platforms": ["macOS"],
+  "categories": ["Productivity"],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "translate-selection",
+      "title": "Translate Selection",
+      "description": "Translate the selected text and preview it before pasting",
+      "mode": "view"
+    },
+    {
+      "name": "improve-english",
+      "title": "Improve English",
+      "description": "Rewrite the selected text into clear English and paste it",
+      "mode": "no-view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "targetLanguage",
+      "type": "textfield",
+      "required": false,
+      "title": "Target Language",
+      "description": "Language used by Translate Selection",
+      "default": "Russian",
+      "placeholder": "Russian"
+    },
+    {
+      "name": "grokPath",
+      "type": "textfield",
+      "required": false,
+      "title": "Grok CLI Path",
+      "description": "Optional path to the grok binary. Leave empty to auto-detect",
+      "placeholder": "/opt/homebrew/bin/grok"
+    },
+    {
+      "name": "model",
+      "type": "textfield",
+      "required": false,
+      "title": "Model",
+      "description": "Optional model id passed to grok --model",
+      "placeholder": "grok-4"
+    },
+    {
+      "name": "translateInstructions",
+      "type": "textfield",
+      "required": false,
+      "title": "Translation Instructions",
+      "description": "Optional extra guidance for translation, such as tone or terms to keep",
+      "placeholder": "Formal tone. Keep product names in English."
+    },
+    {
+      "name": "improveInstructions",
+      "type": "textfield",
+      "required": false,
+      "title": "English Instructions",
+      "description": "Optional extra guidance for Improve English",
+      "placeholder": "Keep it casual. Use British spelling."
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^2.13.1",
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "eslint": "^9.39.4",
+    "prettier": "^3.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "test": "tsx --test test/**/*.test.ts"
+  }
+}
